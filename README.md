@@ -11,7 +11,7 @@ Right now, there are four Jupyter notebooks:
 - `03_cris_download_run_range.ipynb`:  Create a multi-day TROPESS CrIS-JPSS1 plot from a range of dates for all available species.
 - `04_airs-omi_download_run_range.ipynb`:  Create a multi-day TROPESS AIRS-OMI ozone plot.
 
-These notebooks (and accompanying code) will allow you to tailor the plots to your needs, for example, if you want to change the colorbars.
+These notebooks (and accompanying code) will allow give you some setup information, and then you can tailor the plots to your needs, for example, if you want to change the colorbars.
 
 ## Installation
 
