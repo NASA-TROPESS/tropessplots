@@ -5,7 +5,8 @@ Includes     :  read_l2summary()
                 read_l2standard()
 Author       :  Frank Werner
 Date         :  20251008
-Modf         :  20251009: Adjusted read_l2standard() to only read certain variables if they exist
+Modf         :  20260720: Updated for differences in TROPESS v1 vs. v2 files
+                20251009: Adjusted read_l2standard() to only read certain variables if they exist
                 20251021: Changed the row proxy from 10000 to 15000 in read_l2summary() and read_l2standard()
 
 """
@@ -51,7 +52,7 @@ class _ReadL2Summary ():
                  time,
                  land_flag,
                  day_night_flag,
-                 target_id,
+                 # target_id,
                  doy,
                  col,
                  col_t,
@@ -82,7 +83,7 @@ class _ReadL2Summary ():
         self.time = time
         self.land_flag = land_flag
         self.day_night_flag = day_night_flag
-        self.target_id = target_id
+        # self.target_id = target_id
         self.doy = doy
 
         self.col = col
@@ -122,7 +123,7 @@ def read_l2summary(files=None,
                  '/year_fraction',
                  '/altitude',
                  '/pressure',
-                 '/target_id',
+                 # '/target_id',
                  '/geolocation/airs_granule',
                  '/geolocation/airs_atrack',
                  '/geolocation/airs_xtrack',
@@ -135,6 +136,7 @@ def read_l2summary(files=None,
                  '/geophysical/land_flag',
                  '/geophysical/day_night_flag',
                  '/x',
+                 '/observation_ops/xa',
                  '/xa',
                  '/col',
                  '/col_error',
@@ -166,7 +168,7 @@ def read_l2summary(files=None,
     time = np.zeros((n_rows), dtype=np.float32)
     land_flag = np.zeros((n_rows), dtype=np.int32)
     day_night_flag = np.zeros((n_rows), dtype=np.int32)
-    target_id = np.zeros((n_rows), dtype=np.int32)
+    # target_id = np.zeros((n_rows), dtype=np.int32)
     doy = np.zeros((n_rows), dtype=np.int32)
 
     # 'mol m-2', 'for_molecules_per_cm2_multiply_by': [6.022141e+19], 'for_dobson_units_multiply_by': array([2241.1475], dtype=float32)
@@ -191,6 +193,7 @@ def read_l2summary(files=None,
 
         # Fill global attributes
         global_attrs[i_files] = data.global_attrs
+        versionID = int(data.global_attrs['VersionID'])
 
         # Find length of the variables in this file
         l = len(data.values['/geolocation/airs_granule'][:])
@@ -231,7 +234,7 @@ def read_l2summary(files=None,
                   l] = data.values['/geophysical/land_flag'][:]
         day_night_flag[count:count +
                        l] = data.values['/geophysical/day_night_flag'][:]
-        target_id[count:count+l] = data.values['/target_id'][:]
+        # target_id[count:count+l] = data.values['/target_id'][:]
         doy[count:count+l] = date_to_julian_day(int(files[i_files][pos_date2+1:pos_date2+5]),
                                                 int(files[i_files]
                                                     [pos_date2+5:pos_date2+7]),
@@ -242,7 +245,10 @@ def read_l2summary(files=None,
         col_error[count:count+l] = data.values['/col_error'][:]
         col_dry_air[count:count+l] = data.values['/col_dry_air'][:]
         x[count:count+l, :] = data.values['/x'][:, :]
-        x_prior[count:count+l, :] = data.values['/xa'][:]
+        if versionID == 1:
+            x_prior[count:count+l, :] = data.values['/xa'][:]
+        else:
+            x_prior[count:count+l, :] = data.values['/observation_ops/xa'][:]
 
         # Update the count
         count += l
@@ -265,7 +271,7 @@ def read_l2summary(files=None,
     time = time[0:count]
     land_flag = land_flag[0:count]
     day_night_flag = day_night_flag[0:count]
-    target_id = target_id[0:count]
+    # target_id = target_id[0:count]
     doy = doy[0:count]
 
     col = col[0:count]
@@ -296,7 +302,7 @@ def read_l2summary(files=None,
                           time,
                           land_flag,
                           day_night_flag,
-                          target_id,
+                          # target_id,
                           doy,
                           col,
                           col_t,
@@ -339,7 +345,7 @@ class _ReadL2Standard ():
                  time,
                  land_flag,
                  day_night_flag,
-                 target_id,
+                 # target_id,
                  doy,
                  x,
                  x_prior,
@@ -369,7 +375,7 @@ class _ReadL2Standard ():
         self.time = time
         self.land_flag = land_flag
         self.day_night_flag = day_night_flag
-        self.target_id = target_id
+        # self.target_id = target_id
         self.doy = doy
 
         self.x = x
@@ -424,7 +430,7 @@ def read_l2standard(files=None,
     time = np.zeros((n_rows), dtype=np.float32)
     land_flag = np.zeros((n_rows), dtype=np.int32)
     day_night_flag = np.zeros((n_rows), dtype=np.int32)
-    target_id = np.zeros((n_rows), dtype=np.int32)
+    # target_id = np.zeros((n_rows), dtype=np.int32)
     doy = np.zeros((n_rows), dtype=np.int32)
 
     x = np.zeros((n_rows, n_col), dtype=np.float32)  # vmr in ppbv
@@ -484,8 +490,8 @@ def read_l2standard(files=None,
                   l] = data.values['/geophysical/land_flag'][:]
         day_night_flag[count:count +
                        l] = data.values['/geophysical/day_night_flag'][:]
-        if '/target_id' in data.datasets:
-            target_id[count:count+l] = data.values['/target_id'][:]
+        # if '/target_id' in data.datasets:
+        #     target_id[count:count+l] = data.values['/target_id'][:]
         doy[count:count+l] = date_to_julian_day(int(files[i_files][pos_date2+1:pos_date2+5]),
                                                 int(files[i_files]
                                                     [pos_date2+5:pos_date2+7]),
@@ -523,7 +529,7 @@ def read_l2standard(files=None,
     time = time[0:count]
     land_flag = land_flag[0:count]
     day_night_flag = day_night_flag[0:count]
-    target_id = target_id[0:count]
+    # target_id = target_id[0:count]
     doy = doy[0:count]
 
     x = x[0:count]
@@ -536,8 +542,8 @@ def read_l2standard(files=None,
     
     if np.std(airs_granule) == 0:
         airs_granule = None
-    if np.std(target_id) == 0:
-        target_id = None
+    # if np.std(target_id) == 0:
+    #     target_id = None
     if np.std(air_density) == 0:
         air_density = None
 
@@ -560,7 +566,7 @@ def read_l2standard(files=None,
                            time,
                            land_flag,
                            day_night_flag,
-                           target_id,
+                           # target_id,
                            doy,
                            x,
                            x_prior,
