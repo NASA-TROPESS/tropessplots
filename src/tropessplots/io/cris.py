@@ -9,7 +9,8 @@ Includes     :  read_cris_l1b()
                 read_l2standard()
 Author        : Frank Werner
 Date          : 20240722
-Modf          : 20240723: added automatic species detection for read_l2standard()
+Modf          : 20260720: updated for differences in TROPESS v1 vs. v2 files
+                20240723: added automatic species detection for read_l2standard()
                 20240913: added land_flag, cod, cqa, res_mean, res_rms to read_l2muses()
                 20241205: added species to each class object; added number_of_files,
                           and global_attrs to read_l2summary() and read_l2standard()
@@ -963,9 +964,9 @@ def read_l2summary(files=None,
                      '/x_col',
                      '/x_col_error',
                      '/x',
-                     '/xa',
-                     '/ak_col',
-                     '/ak_x_col']
+                     '/observation_ops/xa',
+                     '/observation_ops/ak_col',
+                     '/observation_ops/ak_x_col']
         n_col = 14
     if species == 'NH3':
         data_sets = ['/geolocation/cris_granule',
@@ -983,8 +984,8 @@ def read_l2summary(files=None,
                      '/col',
                      '/col_error',
                      '/x',
-                     '/xa',
-                     '/ak_col']
+                     '/observation_ops/xa',
+                     '/observation_ops/ak_col']
         n_col = 15
     if species == 'O3':
         data_sets = ['/geolocation/cris_granule',
@@ -1004,7 +1005,7 @@ def read_l2summary(files=None,
                      '/col_ut',
                      '/col_error',
                      '/x',
-                     '/xa']
+                     '/observation_ops/xa']
         n_col = 26
     if species == 'CH4':
         data_sets = ['/geolocation/cris_granule',
@@ -1022,8 +1023,8 @@ def read_l2summary(files=None,
                      '/x_col_p',
                      '/x_col_p_error',
                      '/x',
-                     '/xa',
-                     '/ak_x_col_p']
+                     '/observation_ops/xa',
+                     '/observation_ops/ak_x_col_p']
         n_col = 26
     if species == 'PAN':
         data_sets = ['/geolocation/cris_granule',
@@ -1040,8 +1041,8 @@ def read_l2summary(files=None,
                      '/geolocation/cris_view_ang',
                      '/x_col_ft',
                      '/x_col_ft_error',
-                     '/xa_col_ft',
-                     '/ak_x_col_ft']
+                     '/observation_ops/xa_col_ft',
+                     '/observation_ops/ak_x_col_ft']
         n_col = 16
 
     # Define arrays
@@ -1093,7 +1094,8 @@ def read_l2summary(files=None,
         
         # Fill global attributes
         global_attrs[i_files] = data.global_attrs
-
+        versionID = int(data.global_attrs['VersionID'])
+        
         # Find length of the variables in this file
         l = len(data.values['/geolocation/cris_granule'][:])
 
@@ -1515,7 +1517,8 @@ def read_l2standard(files=None,
                      '/observation_ops/xa',
                      '/x',
                      '/x_h2o']
-        n_col = 17
+        # We'll set n_col later for HDO because of the variability
+        # in size between Version 1 and 2
 
     # Define arrays
     number_of_files = len(files)
@@ -1530,20 +1533,22 @@ def read_l2standard(files=None,
     cross_index = np.zeros((n_rows), dtype=np.int32)
     latitude = np.zeros((n_rows), dtype=np.float32)
     longitude = np.zeros((n_rows), dtype=np.float32)
-    pressure = np.zeros((n_rows, n_col), dtype=np.float32)
-    utc = np.zeros((n_rows), dtype=np.float32)
-    time = np.zeros((n_rows), dtype=np.float32)
-    land_flag = np.zeros((n_rows), dtype=np.int32)
-    day_night_flag = np.zeros((n_rows), dtype=np.int32)
-    view_ang = np.zeros((n_rows), dtype=np.float32)
-    doy = np.zeros((n_rows), dtype=np.int32)
+    # If the species isn't HDO make pressure now; if it is HDO we'll do it later
+    if species != 'HDO':
+        pressure = np.zeros((n_rows, n_col), dtype=np.float32)
+        utc = np.zeros((n_rows), dtype=np.float32)
+        time = np.zeros((n_rows), dtype=np.float32)
+        land_flag = np.zeros((n_rows), dtype=np.int32)
+        day_night_flag = np.zeros((n_rows), dtype=np.int32)
+        view_ang = np.zeros((n_rows), dtype=np.float32)
+        doy = np.zeros((n_rows), dtype=np.int32)    
 
-    x = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
-    x_error = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
-    x_prior = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
+        x = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
+        x_error = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
+        x_prior = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
 
-    ak = np.zeros((n_rows, n_col, n_col), dtype=np.float32)
-    signal_dof = np.zeros((n_rows), dtype=np.float32)
+        ak = np.zeros((n_rows, n_col, n_col), dtype=np.float32)
+        signal_dof = np.zeros((n_rows), dtype=np.float32)
 
     count = 0
     for i_files in range(0, number_of_files):
@@ -1554,7 +1559,8 @@ def read_l2standard(files=None,
         
         # Fill global attributes
         global_attrs[i_files] = data.global_attrs
-
+        versionID = int(data.global_attrs['VersionID'])
+        
         # Find length of the variables in this file
         l = len(data.values['/geolocation/cris_granule'][:])
 
@@ -1572,6 +1578,37 @@ def read_l2standard(files=None,
                     l] = data.values['/geolocation/cris_xtrack'][:]
         latitude[count:count+l] = data.values['/latitude'][:]
         longitude[count:count+l] = data.values['/longitude'][:]
+        # If this is HDO, let's set the pressure now
+        if versionID == 1 and species == 'HDO':
+            n_col = 17
+            pressure = np.zeros((n_rows, n_col), dtype=np.float32)
+            utc = np.zeros((n_rows), dtype=np.float32)
+            time = np.zeros((n_rows), dtype=np.float32)
+            land_flag = np.zeros((n_rows), dtype=np.int32)
+            day_night_flag = np.zeros((n_rows), dtype=np.int32)
+            view_ang = np.zeros((n_rows), dtype=np.float32)
+            doy = np.zeros((n_rows), dtype=np.int32)
+            x = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
+            x_error = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
+            x_prior = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
+            ak = np.zeros((n_rows, n_col, n_col), dtype=np.float32)
+            signal_dof = np.zeros((n_rows), dtype=np.float32)
+        elif versionID == 2 and species == 'HDO':
+            n_col = 34
+            pressure = np.zeros((n_rows, n_col), dtype=np.float32)
+            utc = np.zeros((n_rows), dtype=np.float32)
+            time = np.zeros((n_rows), dtype=np.float32)
+            land_flag = np.zeros((n_rows), dtype=np.int32)
+            day_night_flag = np.zeros((n_rows), dtype=np.int32)
+            view_ang = np.zeros((n_rows), dtype=np.float32)
+            doy = np.zeros((n_rows), dtype=np.int32)
+            x = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
+            x_error = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
+            x_prior = np.zeros((n_rows, n_col), dtype=np.float32) # vmr in ppbv
+            ak = np.zeros((n_rows, n_col, n_col), dtype=np.float32)
+            signal_dof = np.zeros((n_rows), dtype=np.float32)
+        else:
+            pass        
         pressure[count:count+l] = data.values['/pressure'][:]
         dummy_utc = data.values['/datetime_utc'][:, 3] + \
             data.values['/datetime_utc'][:, 4]/60 + \

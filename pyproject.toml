@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tropessplots"
-version = "1.0"
+version = "2.0"
 description = "TROPESS Website Plots"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache 2.0" }
 authors = [
+  { name = "Frank Werner", email = "Frank.Werner@jpl.nasa.gov"},
   { name = "Brian Knosp", email = "Brian.Knosp@jpl.nasa.gov" }
 ]
 
@@ -36,6 +37,7 @@ dependencies = [
   "debugpy==1.8.19",
   "decorator==5.2.1",
   "defusedxml==0.7.1",
+  "earthaccess==0.18.0",
   "executing==2.2.1",
   "fastjsonschema==2.21.2",
   "fonttools==4.61.1",
